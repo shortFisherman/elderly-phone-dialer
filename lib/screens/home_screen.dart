@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:phone_call2/models/contact.dart';
@@ -30,16 +31,28 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final PhoneService _phoneService = const PhoneService();
   int _plusTapCount = 0;
+  Timer? _resetTimer;
+
+  @override
+  void dispose() {
+    _resetTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _call(Contact contact) async {
     await _phoneService.call(contact.phoneNumber);
   }
 
   void _onPlusTap() {
+    _resetTimer?.cancel();
     _plusTapCount++;
     if (_plusTapCount >= 5) {
       _plusTapCount = 0;
       widget.onManageTap();
+    } else {
+      _resetTimer = Timer(const Duration(seconds: 3), () {
+        _plusTapCount = 0;
+      });
     }
   }
 

@@ -209,11 +209,7 @@ class _ContactEditorState extends State<_ContactEditor> {
   Future<void> _pickPhoto() async {
     final path = await widget.photoService.pickAndSave();
     if (path.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('存储空间不足，请清理后重试')),
-        );
-      }
+      // User cancelled or error -- don't show misleading error
       return;
     }
     setState(() => _photoPath = path);

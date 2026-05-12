@@ -65,10 +65,11 @@ class _AppShellState extends State<AppShell> {
       return ManageScreen(
         contacts: List.from(_contactService.getAll()),
         onSave: (contact) {
-          if (contact.id.isEmpty) {
-            _contactService.add(contact);
-          } else {
+          final exists = _contactService.getAll().any((c) => c.id == contact.id);
+          if (exists) {
             _contactService.update(contact);
+          } else {
+            _contactService.add(contact);
           }
         },
         onDelete: (id) => _contactService.delete(id),
