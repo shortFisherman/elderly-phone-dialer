@@ -1,0 +1,40 @@
+# Flutter
+.dart_tool/
+.packages
+build/
+*.iml
+.idea/
+.dart_tool/
+flutter_*.png
+linked_*.ds_store
+
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+*.class
+*.jar
+*.apk
+*.aab
+local.properties
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude CLI
+.superpowers/
+.claude/
+
+# Misc
+*.log
+*.tmp
+.env
