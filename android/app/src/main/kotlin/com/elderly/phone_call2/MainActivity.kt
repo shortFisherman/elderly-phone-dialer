@@ -8,15 +8,14 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.telephony.PhoneStateListener
-import android.telephony.TelephonyManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.elderly.phone_call2/phone"
-    private var speakerphoneEnabler: SpeakerphoneEnabler? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var speakerphoneRunnable: Runnable? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -31,8 +30,7 @@ class MainActivity : FlutterActivity() {
                     }
 
                     try {
-                        speakerphoneEnabler = SpeakerphoneEnabler(this)
-                        speakerphoneEnabler?.start()
+                        startSpeakerphoneLoop()
 
                         val intent = Intent(Intent.ACTION_CALL)
                         intent.data = Uri.parse("tel:$phoneNumber")
@@ -50,103 +48,86 @@ class MainActivity : FlutterActivity() {
             }
     }
 
-    override fun onDestroy() {
-        speakerphoneEnabler?.stop()
-        speakerphoneEnabler = null
-        super.onDestroy()
-    }
-}
+    /**
+     * Starts a repeating attempt to enable speakerphone.
+     * Tries every 800ms, up to 15 attempts (~12 seconds).
+     *
+     * Uses every available API at once, because Android OEMs differ in which
+     * one they actually respect during a cellular call:
+     *   - setSpeakerphoneOn()        (deprecated in 31+, but still works on some)
+     *   - setCommunicationDevice()   (API 31+, works on some)
+     *   - AudioSystem.setForceUse()  (hidden API, works on some OEMs)
+     */
+    private fun startSpeakerphoneLoop() {
+        stopSpeakerphoneLoop()
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val maxAttempts = 15
+        val intervalMs = 800L
 
-/**
- * Listens for call state changes and enables speakerphone when the call connects.
- *
- * Uses the correct API based on Android version:
- * - API 31+ (Android 12): [AudioManager.setCommunicationDevice] with built-in speaker.
- *   [AudioManager.setSpeakerphoneOn] is deprecated and non-functional from API 31.
- * - API 21-30: [AudioManager.setSpeakerphoneOn] with MODE_IN_CALL (still works).
- */
-class SpeakerphoneEnabler(private val activity: MainActivity) {
-    private val audioManager: AudioManager
-        get() = activity.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private val telephonyManager: TelephonyManager
-        get() = activity.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-    private val handler = Handler(Looper.getMainLooper())
-    private var callConnected = false
-    private var retryCount = 0
+        val runnable = object : Runnable {
+            var attempt = 0
 
-    private val phoneStateListener = object : PhoneStateListener() {
-        override fun onCallStateChanged(state: Int, phoneNumber: String?) {
-            when (state) {
-                TelephonyManager.CALL_STATE_OFFHOOK -> {
-                    callConnected = true
-                    enableSpeakerphone()
-                }
-                TelephonyManager.CALL_STATE_IDLE -> {
-                    if (callConnected) {
-                        callConnected = false
-                        resetAudio()
+            override fun run() {
+                if (attempt >= maxAttempts) return
+                attempt++
+
+                // 1. Always try setSpeakerphoneOn — still functional on many devices
+                audioManager.mode = AudioManager.MODE_IN_CALL
+                audioManager.isSpeakerphoneOn = true
+
+                // 2. API 31+: also try setCommunicationDevice
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val speaker = audioManager.availableCommunicationDevices
+                        .firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+                    if (speaker != null) {
+                        audioManager.setCommunicationDevice(speaker)
                     }
                 }
+
+                // 3. Try hidden API AudioSystem.setForceUse(FOR_COMMUNICATION, FORCE_SPEAKER)
+                trySetForceSpeaker()
+
+                // Continue if speakerphone still not active
+                if (!audioManager.isSpeakerphoneOn && attempt < maxAttempts) {
+                    handler.postDelayed(this, intervalMs)
+                }
             }
         }
+        speakerphoneRunnable = runnable
+        handler.postDelayed(runnable, 1000) // first delay: wait for call to start connecting
     }
 
-    fun start() {
+    private fun stopSpeakerphoneLoop() {
+        speakerphoneRunnable?.let { handler.removeCallbacks(it) }
+        speakerphoneRunnable = null
+    }
+
+    /**
+     * Uses reflection to call the hidden API:
+     *   android.media.AudioSystem.setForceUse(FOR_COMMUNICATION, FORCE_SPEAKER)
+     *
+     * This is a private Android API, but it's the lowest-level way to force
+     * audio routing to speaker. Works on many OEM devices even when the
+     * public APIs are blocked.
+     */
+    private fun trySetForceSpeaker() {
         try {
-            telephonyManager.listen(
-                phoneStateListener,
-                PhoneStateListener.LISTEN_CALL_STATE
-            )
-        } catch (_: SecurityException) {
-            // READ_PHONE_STATE not granted — try delayed approach as fallback.
-            handler.postDelayed({ enableSpeakerphone() }, 1500)
-            handler.postDelayed({ enableSpeakerphone() }, 3000)
+            val audioSystemClass = Class.forName("android.media.AudioSystem")
+            val setForceUse = audioSystemClass.getMethod("setForceUse", Int::class.javaPrimitiveType!!, Int::class.javaPrimitiveType!!)
+            // FOR_COMMUNICATION = 1, FORCE_SPEAKER = 1
+            setForceUse.invoke(null, 1, 1)
+        } catch (_: Exception) {
+            // Hidden API blocked or not available — ignore
         }
     }
 
-    fun stop() {
+    override fun onDestroy() {
+        stopSpeakerphoneLoop()
         try {
-            telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE)
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            audioManager.isSpeakerphoneOn = false
+            audioManager.mode = AudioManager.MODE_NORMAL
         } catch (_: Exception) {}
-        handler.removeCallbacksAndMessages(null)
-        if (callConnected) {
-            resetAudio()
-        }
-    }
-
-    private fun enableSpeakerphone() {
-        val am = audioManager
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // API 31+: setCommunicationDevice() is the replacement for setSpeakerphoneOn()
-            am.mode = AudioManager.MODE_IN_COMMUNICATION
-
-            val speaker = am.availableCommunicationDevices
-                .firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
-
-            if (speaker != null) {
-                am.setCommunicationDevice(speaker)
-            }
-
-            // On some devices setCommunicationDevice reports success but doesn't route
-            // audio. Retry a few times as a workaround.
-            if (!am.isSpeakerphoneOn && retryCount < 5) {
-                retryCount++
-                handler.postDelayed({ enableSpeakerphone() }, 1000)
-            }
-        } else {
-            // API 21-30: original API still works
-            am.mode = AudioManager.MODE_IN_CALL
-            am.isSpeakerphoneOn = true
-        }
-    }
-
-    private fun resetAudio() {
-        val am = audioManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            am.clearCommunicationDevice()
-        }
-        am.isSpeakerphoneOn = false
-        am.mode = AudioManager.MODE_NORMAL
+        super.onDestroy()
     }
 }
