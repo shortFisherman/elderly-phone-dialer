@@ -16,9 +16,13 @@ class ContactService extends ChangeNotifier {
     _load();
   }
 
-  ContactService.test() {
-    // In-memory only, skip file load
+  final bool _isTest;
+
+  ContactService() : _isTest = false {
+    _load();
   }
+
+  ContactService.test() : _isTest = true;
 
   List<Contact> getAll() => List.unmodifiable(_contacts);
 
@@ -56,6 +60,7 @@ class ContactService extends ChangeNotifier {
   }
 
   Future<void> _save() async {
+    if (_isTest) return;
     final dir = await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/contacts.json');
     final json = _contacts.map((c) => c.toJson()).toList();

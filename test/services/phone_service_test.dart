@@ -13,6 +13,16 @@ void main() {
       const MethodChannel('com.elderly.phone_call2/phone'),
       (MethodCall methodCall) async => true,
     );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('flutter.baseflow.com/permissions/methods'),
+      (MethodCall methodCall) async {
+        if (methodCall.method == 'requestPermissions') {
+          return {'status': 1}; // granted
+        }
+        return null;
+      },
+    );
     service = const PhoneService();
   });
 
@@ -20,6 +30,11 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
       const MethodChannel('com.elderly.phone_call2/phone'),
+      null,
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('flutter.baseflow.com/permissions/methods'),
       null,
     );
   });
