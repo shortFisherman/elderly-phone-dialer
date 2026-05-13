@@ -13,17 +13,17 @@ class ContactService extends ChangeNotifier {
   static const int _colorCount = 10;
   static const int maxContacts = 30;
   final bool _isTest;
-  final Completer<void> _ready = Completer<void>();
+  final Completer<bool> _ready = Completer<bool>();
 
   ContactService() : _isTest = false {
     _load();
   }
 
   ContactService.test() : _isTest = true {
-    _ready.complete();
+    _ready.complete(true);
   }
 
-  Future<void> get ready => _ready.future;
+  Future<bool> get ready => _ready.future;
 
   List<Contact> getAll() => List.unmodifiable(_contacts);
 
@@ -79,7 +79,7 @@ class ContactService extends ChangeNotifier {
         _nextColorIndex = _contacts.last.colorIndex + 1;
       }
     }
-    if (!_ready.isCompleted) _ready.complete();
+    if (!_ready.isCompleted) _ready.complete(true);
     notifyListeners();
   }
 }
