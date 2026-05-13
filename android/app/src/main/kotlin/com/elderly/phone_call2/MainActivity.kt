@@ -1,5 +1,6 @@
 package com.elderly.phone_call2
 
+import android.content.Context
 import android.content.Intent
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
@@ -66,9 +67,9 @@ class MainActivity : FlutterActivity() {
  */
 class SpeakerphoneEnabler(private val activity: MainActivity) {
     private val audioManager: AudioManager
-        get() = activity.getSystemService(AUDIO_SERVICE) as AudioManager
+        get() = activity.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val telephonyManager: TelephonyManager
-        get() = activity.getSystemService(TELEPHONY_SERVICE) as TelephonyManager
+        get() = activity.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
     private val handler = Handler(Looper.getMainLooper())
     private var callConnected = false
     private var retryCount = 0
