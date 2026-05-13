@@ -55,39 +55,50 @@ class _AppShellState extends State<AppShell> {
   void _exitManageMode() {
     setState(() => _inManageMode = false);
     if (_contactService.getAll().isEmpty) {
-      return; // Stay in manage mode
+      return;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_inManageMode) {
-      return ManageScreen(
-        contacts: List.from(_contactService.getAll()),
-        onSave: (contact) {
-          final exists = _contactService.getAll().any((c) => c.id == contact.id);
-          if (exists) {
-            _contactService.update(contact);
-          } else {
-            _contactService.add(contact);
-          }
-        },
-        onDelete: (id) => _contactService.delete(id),
-        onClose: _exitManageMode,
-      );
-    }
+    return FutureBuilder(
+      future: _contactService.ready,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
 
-    final contacts = _contactService.getAll();
+        if (_inManageMode) {
+          return ManageScreen(
+            contacts: List.from(_contactService.getAll()),
+            onSave: (contact) {
+              final exists =
+                  _contactService.getAll().any((c) => c.id == contact.id);
+              if (exists) {
+                _contactService.update(contact);
+              } else {
+                _contactService.add(contact);
+              }
+            },
+            onDelete: (id) => _contactService.delete(id),
+            onClose: _exitManageMode,
+          );
+        }
 
-    // First launch: auto-enter manage mode
-    if (contacts.isEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _enterManageMode());
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+        final contacts = _contactService.getAll();
 
-    return HomeScreen(
-      contacts: contacts,
-      onManageTap: _enterManageMode,
+        if (contacts.isEmpty) {
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => _enterManageMode());
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
+        }
+
+        return HomeScreen(
+          contacts: contacts,
+          onManageTap: _enterManageMode,
+        );
+      },
     );
   }
 }

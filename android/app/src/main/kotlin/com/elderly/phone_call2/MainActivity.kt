@@ -3,15 +3,15 @@ package com.elderly.phone_call2
 import android.content.Intent
 import android.net.Uri
 import android.media.AudioManager
-import android.telephony.PhoneStateListener
-import android.telephony.TelephonyManager
+import android.os.Handler
+import android.os.Looper
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.elderly.phone_call2/phone"
-    private var speakerphoneListener: PhoneStateListener? = null
+    private val handler = Handler(Looper.getMainLooper())
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -26,11 +26,11 @@ class MainActivity : FlutterActivity() {
                     }
 
                     try {
-                        setupSpeakerphoneOnCall()
-
                         val intent = Intent(Intent.ACTION_CALL)
                         intent.data = Uri.parse("tel:$phoneNumber")
                         startActivity(intent)
+
+                        enableSpeakerphoneWithRetry(1000, 0)
 
                         result.success(true)
                     } catch (e: SecurityException) {
@@ -44,45 +44,15 @@ class MainActivity : FlutterActivity() {
             }
     }
 
-    private fun setupSpeakerphoneOnCall() {
-        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        val telephonyManager = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
+    private fun enableSpeakerphoneWithRetry(delayMs: Long, attempt: Int) {
+        handler.postDelayed({
+            val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            audioManager.isSpeakerphoneOn = true
 
-        speakerphoneListener = object : PhoneStateListener() {
-            override fun onCallStateChanged(state: Int, phoneNumber: String?) {
-                when (state) {
-                    TelephonyManager.CALL_STATE_OFFHOOK -> {
-                        // Call connected — enable speakerphone
-                        audioManager.mode = AudioManager.MODE_IN_CALL
-                        audioManager.isSpeakerphoneOn = true
-                    }
-                    TelephonyManager.CALL_STATE_IDLE -> {
-                        // Call ended — reset and remove listener
-                        audioManager.isSpeakerphoneOn = false
-                        audioManager.mode = AudioManager.MODE_NORMAL
-                        telephonyManager.listen(
-                            this, PhoneStateListener.LISTEN_NONE
-                        )
-                        speakerphoneListener = null
-                    }
-                }
+            if (!audioManager.isSpeakerphoneOn && attempt < 3) {
+                enableSpeakerphoneWithRetry(800, attempt + 1)
             }
-        }
-
-        telephonyManager.listen(
-            speakerphoneListener,
-            PhoneStateListener.LISTEN_CALL_STATE
-        )
-    }
-
-    override fun onDestroy() {
-        speakerphoneListener?.let {
-            try {
-                val telephonyManager = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
-                telephonyManager.listen(it, PhoneStateListener.LISTEN_NONE)
-            } catch (_: Exception) {}
-            speakerphoneListener = null
-        }
-        super.onDestroy()
+        }, delayMs)
     }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -12,12 +13,17 @@ class ContactService extends ChangeNotifier {
   static const int _colorCount = 10;
   static const int maxContacts = 30;
   final bool _isTest;
+  final Completer<void> _ready = Completer<void>();
 
   ContactService() : _isTest = false {
     _load();
   }
 
-  ContactService.test() : _isTest = true;
+  ContactService.test() : _isTest = true {
+    _ready.complete();
+  }
+
+  Future<void> get ready => _ready.future;
 
   List<Contact> getAll() => List.unmodifiable(_contacts);
 
@@ -73,5 +79,7 @@ class ContactService extends ChangeNotifier {
         _nextColorIndex = _contacts.last.colorIndex + 1;
       }
     }
+    if (!_ready.isCompleted) _ready.complete();
+    notifyListeners();
   }
 }
