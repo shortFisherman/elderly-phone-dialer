@@ -11,11 +11,6 @@ class ContactService extends ChangeNotifier {
   int _nextColorIndex = 0;
   static const int _colorCount = 10;
   static const int maxContacts = 30;
-
-  ContactService() {
-    _load();
-  }
-
   final bool _isTest;
 
   ContactService() : _isTest = false {
