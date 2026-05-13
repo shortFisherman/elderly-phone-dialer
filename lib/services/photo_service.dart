@@ -7,13 +7,13 @@ class PhotoService {
   final ImagePicker _picker;
   final Uuid _uuid;
 
-  const PhotoService({
+  PhotoService({
     required ImagePicker picker,
     required Uuid uuid,
   })  : _picker = picker,
        _uuid = uuid;
 
-  factory PhotoService() => PhotoService(
+  factory PhotoService.create() => PhotoService(
         picker: ImagePicker(),
         uuid: const Uuid(),
       );

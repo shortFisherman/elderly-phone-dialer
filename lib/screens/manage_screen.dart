@@ -36,7 +36,7 @@ class ManageScreen extends StatefulWidget {
 }
 
 class _ManageScreenState extends State<ManageScreen> {
-  final PhotoService _photoService = const PhotoService();
+  final PhotoService _photoService = PhotoService.create();
   late List<Contact> _contacts;
 
   @override
