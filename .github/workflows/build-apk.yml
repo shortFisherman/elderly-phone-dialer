@@ -16,12 +16,11 @@ jobs:
           flutter-version: '3.27.0'
           channel: 'stable'
 
-      - name: Create dummy key.properties
+      - name: Create local.properties
         run: |
-          echo "storePassword=android" > android/key.properties
-          echo "keyPassword=android" >> android/key.properties
-          echo "keyAlias=key" >> android/key.properties
-          echo "storeFile=debug.keystore" >> android/key.properties
+          FLUTTER_ROOT=$(dirname $(dirname $(which flutter)))
+          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+          echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
 
       - name: Install dependencies
         run: flutter pub get
